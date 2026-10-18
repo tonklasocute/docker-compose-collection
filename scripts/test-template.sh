@@ -40,7 +40,9 @@ step() { printf '%s==> [%s] %s%s\n' "$BOLD" "$NAME" "$*" "$RESET"; }
 
 # Work on a copy so a developer's own .env and running stack are never touched.
 WORK="$ROOT/.tmp/test-$NAME"
-rm -rf "$WORK"
+# (Windows can refuse to delete a directory a shell is still sitting in; the
+# copy below overwrites everything that matters, so carry on.)
+rm -rf "$WORK" 2>/dev/null || echo "warning: could not fully clean $WORK" >&2
 mkdir -p "$WORK"
 tar -C "$SRC" --exclude=.env --exclude=node_modules --exclude=.next \
   --exclude=dist --exclude=tmp -cf - . | tar -C "$WORK" -xf -
@@ -78,6 +80,9 @@ trap cleanup EXIT
 SECONDS=0
 step "validating compose file (profiles: ${COMPOSE_PROFILES:-none})"
 docker compose config --quiet
+
+# Start from nothing, even if an earlier aborted run left containers behind
+docker compose --profile '*' down -v --remove-orphans --timeout 5 >/dev/null 2>&1 || true
 
 step "building and starting (waiting up to ${WAIT_TIMEOUT}s for healthchecks)"
 docker compose up -d --build --wait --wait-timeout "$WAIT_TIMEOUT"
