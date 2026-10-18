@@ -1,0 +1,28 @@
+# Example alerting rules - visible under Alerts in the Prometheus UI.
+# Wire up Alertmanager to actually send notifications.
+groups:
+  - name: basics
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} target {{ $labels.instance }} is down"
+
+      - alert: HostHighCpu
+        expr: 100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU above 90% for 10 minutes on {{ $labels.instance }}"
+
+      - alert: HostLowDiskSpace
+        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes < 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Less than 10% disk left on {{ $labels.mountpoint }}"
