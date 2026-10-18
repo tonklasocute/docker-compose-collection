@@ -3,6 +3,8 @@
 # shellcheck disable=SC2016  # $VARS in single quotes expand inside the container
 set -euo pipefail
 cd "$(dirname "$0")"
+# Git Bash on Windows rewrites /container/paths in arguments; turn that off
+export MSYS_NO_PATHCONV=1
 
 check() {
   local desc=$1 out

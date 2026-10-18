@@ -3,6 +3,8 @@
 # shellcheck disable=SC2016  # $VARS in single quotes expand inside the container
 set -euo pipefail
 cd "$(dirname "$0")"
+# Git Bash on Windows rewrites /container/paths in arguments; turn that off
+export MSYS_NO_PATHCONV=1
 
 check() {
   local desc=$1 out
@@ -45,7 +47,7 @@ check "port 27017 is published on 127.0.0.1" \
 if running mongo-express; then
   port=$(docker compose port mongo-express 8081)
   check "mongo-express rejects requests without credentials" \
-    sh -c "test \"\$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://$port/)\" = 401"
+    sh -c "test \"\$(curl -s -w '\n%{http_code}' --max-time 10 http://$port/ | tail -n1)\" = 401"
   check "mongo-express lists the app database" \
     sh -c "curl -fsS --max-time 10 -u \"\$(grep ^MONGO_EXPRESS_USER= .env | cut -d= -f2):\$(grep ^MONGO_EXPRESS_PASSWORD= .env | cut -d= -f2)\" http://$port/ | grep -q '>app<\\|/db/app'"
 fi

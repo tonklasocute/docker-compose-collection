@@ -46,6 +46,8 @@ tar -C "$SRC" --exclude=.env --exclude=node_modules --exclude=.next \
   --exclude=dist --exclude=tmp -cf - . | tar -C "$WORK" -xf -
 cp "$WORK/.env.example" "$WORK/.env"
 cd "$WORK"
+# Git Bash on Windows rewrites /container/paths in arguments; turn that off
+export MSYS_NO_PATHCONV=1
 
 export COMPOSE_PROJECT_NAME="dcc-test-$NAME"
 export COMPOSE_PROFILES="${TEST_PROFILES-tools}"
