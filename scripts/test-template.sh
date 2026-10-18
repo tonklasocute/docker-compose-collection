@@ -69,7 +69,7 @@ cleanup() {
   else
     step "tearing down"
     docker compose --profile '*' down -v --remove-orphans --timeout 10 >/dev/null 2>&1 || true
-    cd "$ROOT" && rm -rf "$WORK"
+    cd "$ROOT" && { rm -rf "$WORK" 2>/dev/null || echo "warning: could not remove $WORK" >&2; }
   fi
   if [[ $code -eq 0 ]]; then
     printf '%sPASS%s %s (%ss)\n' "$GREEN" "$RESET" "$NAME" "$SECONDS"
