@@ -31,3 +31,6 @@ gitlab-runner/config/*
 Thumbs.db
 .idea/
 .vscode/
+
+# Local tooling output
+.playwright-mcp/
