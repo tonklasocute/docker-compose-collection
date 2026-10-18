@@ -1,0 +1,30 @@
+# Secrets: only .env.example files are committed
+.env
+.env.*
+!.env.example
+
+# Test runs (scripts/test-template.sh works in a scratch copy here)
+.tmp/
+
+# Local data directories (templates use named volumes, but just in case)
+data/
+**/data/
+
+# Build output and dependencies
+node_modules/
+dist/
+.next/
+coverage/
+*.tsbuildinfo
+**/tmp/
+bin/
+
+# gitlab-runner writes its registered config (contains a token) here
+gitlab-runner/config/*
+!gitlab-runner/config/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

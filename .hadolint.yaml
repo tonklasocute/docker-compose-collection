@@ -1,0 +1,6 @@
+failure-threshold: warning
+ignored:
+  # Pinning every apk/apt package version makes rebuilds fail as soon as the
+  # distro repo moves on; base images are pinned instead.
+  - DL3018
+  - DL3008

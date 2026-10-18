@@ -1,0 +1,21 @@
+extends: default
+
+ignore: |
+  node_modules/
+  .tmp/
+
+rules:
+  document-start: disable
+  line-length:
+    max: 140
+    level: warning
+  comments:
+    min-spaces-from-content: 1
+  # GitHub Actions uses `on:` as a key
+  truthy:
+    allowed-values: ["true", "false", "on"]
+    check-keys: false
+  braces:
+    max-spaces-inside: 1
+  brackets:
+    max-spaces-inside: 1
