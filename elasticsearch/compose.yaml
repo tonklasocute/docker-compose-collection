@@ -1,0 +1,123 @@
+# Elasticsearch 8 (single node, security + HTTPS on) + Kibana
+#
+#   cp .env.example .env              # then set ELASTIC_PASSWORD
+#   docker compose up -d --wait       # setup + Elasticsearch
+#   docker compose --profile tools up -d --wait   # + Kibana
+#
+# Start order: setup (certs) -> elasticsearch -> setup sets the kibana_system
+# password and exits -> kibana.
+
+services:
+  # One-shot: certificates + generated Kibana credentials. See setup/setup.sh.
+  setup:
+    image: elasticsearch:8.19.23
+    user: "0"
+    command: ["bash", "/setup/setup.sh"]
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?set ELASTIC_PASSWORD in .env}
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+      - ./setup:/setup:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test -f config/certs/elasticsearch/elasticsearch.crt && test -f config/certs/kibana.env"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    restart: "no"
+    networks: [elastic]
+
+  elasticsearch:
+    image: elasticsearch:8.19.23
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_healthy
+    environment:
+      node.name: elasticsearch
+      cluster.name: ${ES_CLUSTER_NAME:-docker-cluster}
+      # single-node also skips the production bootstrap checks
+      discovery.type: single-node
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      ES_JAVA_OPTS: -Xms${ES_HEAP:-512m} -Xmx${ES_HEAP:-512m}
+      xpack.security.enabled: "true"
+      xpack.security.http.ssl.enabled: "true"
+      xpack.security.http.ssl.key: certs/elasticsearch/elasticsearch.key
+      xpack.security.http.ssl.certificate: certs/elasticsearch/elasticsearch.crt
+      xpack.security.http.ssl.certificate_authorities: certs/ca/ca.crt
+      xpack.license.self_generated.type: basic
+      # Laptops often have >90% full disks; don't flip indices to read-only
+      cluster.routing.allocation.disk.threshold_enabled: "false"
+    ports:
+      # Reachable from this machine only. To expose it on your network, drop
+      # the "127.0.0.1:" prefix (security and TLS are already on).
+      - "127.0.0.1:${ES_PORT:-9200}:9200"
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs:ro
+      - es-data:/usr/share/elasticsearch/data
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fs --cacert config/certs/ca/ca.crt -u "elastic:$${ELASTIC_PASSWORD}"
+          "https://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s" | grep -qv '"timed_out":true'
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: ${ES_MEMORY_LIMIT:-1536m}
+    networks: [elastic]
+
+  kibana:
+    image: kibana:8.19.23
+    profiles: [tools]
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    # Load the generated kibana_system password and encryption keys, then run
+    # the image's normal entrypoint
+    entrypoint:
+      - bash
+      - -c
+      - set -a && . config/certs/kibana.env && set +a && exec /bin/tini -- /usr/local/bin/kibana-docker
+    environment:
+      SERVERNAME: kibana
+      SERVER_PUBLICBASEURL: http://localhost:${KIBANA_PORT:-5601}
+      ELASTICSEARCH_HOSTS: https://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES: config/certs/ca/ca.crt
+      TELEMETRY_OPTIN: "false"
+    ports:
+      - "127.0.0.1:${KIBANA_PORT:-5601}:5601"
+    volumes:
+      - certs:/usr/share/kibana/config/certs:ro
+      - kibana-data:/usr/share/kibana/data
+    healthcheck:
+      # Kibana redirects to the login page once it is up
+      test: ["CMD-SHELL", "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    networks: [elastic]
+
+volumes:
+  certs:
+  es-data:
+  kibana-data:
+
+networks:
+  elastic:
