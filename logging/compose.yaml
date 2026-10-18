@@ -1,0 +1,109 @@
+# Loki + Grafana Alloy + Grafana: every container's logs, searchable
+#
+#   cp .env.example .env              # then set GRAFANA_ADMIN_PASSWORD
+#   docker compose up -d --wait
+#   open http://localhost:3000        # dashboard "Container Logs", or Explore
+#
+# Alloy is the successor to Promtail (end-of-life since March 2026).
+
+services:
+  loki:
+    # Upstream grafana/loki plus a static busybox for the healthcheck,
+    # see loki/Dockerfile
+    build: ./loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/config.yaml"]
+    ports:
+      # Host apps can push logs or query with logcli on localhost:3100
+      - "127.0.0.1:${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/busybox", "wget", "-qO-", "http://127.0.0.1:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    networks: [logging]
+
+  alloy:
+    image: grafana/alloy:v1.20.1
+    restart: unless-stopped
+    depends_on:
+      loki:
+        condition: service_healthy
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    ports:
+      # Alloy's debug UI (pipeline graph, discovered targets)
+      - "127.0.0.1:${ALLOY_PORT:-12345}:12345"
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+      # Read access to the Docker API to discover containers and read their
+      # logs. Note: the socket grants full control of Docker; ":ro" only
+      # stops the file itself from being replaced.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      # No curl/wget in the image; use bash's /dev/tcp
+      test:
+        - CMD
+        - bash
+        - -c
+        - exec 3<>/dev/tcp/127.0.0.1/12345 && printf 'GET /-/ready HTTP/1.0\r\n\r\n' >&3 && grep -q '200 OK' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks: [logging]
+
+  grafana:
+    image: grafana/grafana:13.2.4
+    restart: unless-stopped
+    depends_on:
+      loki:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/container-logs.json
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health | grep -q '\"database\": *\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks: [logging]
+
+volumes:
+  loki-data:
+  alloy-data:
+  grafana-data:
+
+networks:
+  logging:

@@ -1,0 +1,55 @@
+// Grafana Alloy: collect the logs of every container on this Docker host
+// and ship them to Loki. (Alloy replaces Promtail, which is end-of-life.)
+//
+// Debug UI: http://localhost:12345 (component graph and live targets)
+
+// Find running containers through the Docker API
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+// Turn Docker metadata into Loki labels. Keep this list short: every label
+// value combination is a separate stream in Loki.
+discovery.relabel "containers" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "compose_service"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+  // Opt out per container with the label  logging=disabled
+  rule {
+    source_labels = ["__meta_docker_container_label_logging"]
+    regex         = "disabled"
+    action        = "drop"
+  }
+}
+
+// Tail container logs via the Docker API (works on Linux and Docker Desktop)
+loki.source.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  targets          = discovery.docker.containers.targets
+  relabel_rules    = discovery.relabel.containers.rules
+  refresh_interval = "5s"
+  forward_to       = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
