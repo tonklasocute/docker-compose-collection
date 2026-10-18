@@ -1,0 +1,16 @@
+# Keep the build context small and free of secrets
+.env
+.env.*
+!.env.example
+.git
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.md
+Makefile
+smoke-test.sh
+compose.yaml
+Dockerfile
+.dockerignore
+init/
