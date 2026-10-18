@@ -1,0 +1,91 @@
+# MongoDB 7.0 (single-node replica set, so transactions work) + mongo-express
+#
+#   cp .env.example .env              # then change the passwords
+#   docker compose up -d --wait       # MongoDB only
+#   docker compose --profile tools up -d --wait   # + mongo-express
+
+services:
+  mongodb:
+    image: mongo:7.0.45
+    restart: unless-stopped
+    # Generates the replica-set keyfile, then hands over to the official entrypoint
+    entrypoint: ["bash", "/usr/local/bin/keyfile-entrypoint.sh"]
+    command:
+      - mongod
+      - --replSet=${MONGO_REPLICA_SET:-rs0}
+      - --keyFile=/data/configdb/keyfile
+      - --bind_ip_all
+      - --wiredTigerCacheSizeGB=0.25
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in .env}
+      MONGO_REPLICA_SET: ${MONGO_REPLICA_SET:-rs0}
+      # Read by init/01-create-app-user.js on the first start only
+      APP_DB_NAME: ${APP_DB_NAME:-app}
+      APP_DB_USER: ${APP_DB_USER:-app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}
+    ports:
+      # Reachable from this machine only. To expose it on your network, drop
+      # the "127.0.0.1:" prefix - and use strong passwords first.
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongodb-data:/data/db
+      - mongodb-config:/data/configdb
+      - ./keyfile-entrypoint.sh:/usr/local/bin/keyfile-entrypoint.sh:ro
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Initiates the replica set on the first run (member host = service name),
+      # then reports healthy only once this node is a writable primary.
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet -u "$${MONGO_INITDB_ROOT_USERNAME}" -p "$${MONGO_INITDB_ROOT_PASSWORD}"
+          --authenticationDatabase admin --eval "
+          try { rs.status() } catch (e) {
+            rs.initiate({ _id: process.env.MONGO_REPLICA_SET, members: [{ _id: 0, host: 'mongodb:27017' }] })
+          }
+          quit(db.hello().isWritablePrimary ? 0 : 1)"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    networks: [db]
+
+  mongo-express:
+    image: mongo-express:1.0.2-20-alpine3.19
+    profiles: [tools]
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USER:-root}:${MONGO_ROOT_PASSWORD}@mongodb:27017/?replicaSet=${MONGO_REPLICA_SET:-rs0}&authSource=admin
+      ME_CONFIG_BASICAUTH: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:?set MONGO_EXPRESS_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${MONGO_EXPRESS_PORT:-8081}:8081"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO /dev/null "http://$${ME_CONFIG_BASICAUTH_USERNAME}:$${ME_CONFIG_BASICAUTH_PASSWORD}@127.0.0.1:8081/"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    networks: [db]
+
+volumes:
+  mongodb-data:
+  mongodb-config:
+
+networks:
+  db:

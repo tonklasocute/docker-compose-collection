@@ -9,6 +9,8 @@ rules:
   line-length:
     max: 140
     level: warning
+    # Long URLs (connection strings) can't be wrapped meaningfully
+    allow-non-breakable-inline-mappings: true
   comments:
     min-spaces-from-content: 1
   # GitHub Actions uses `on:` as a key
