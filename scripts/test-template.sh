@@ -52,7 +52,10 @@ cd "$WORK"
 export MSYS_NO_PATHCONV=1
 
 export COMPOSE_PROJECT_NAME="dcc-test-$NAME"
-export COMPOSE_PROFILES="${TEST_PROFILES-tools}"
+# Profiles to test: TEST_PROFILES, else a "# test-profiles: a,b" line in the
+# template's smoke-test.sh, else "tools"
+declared=$(sed -n 's/^# test-profiles: *//p' smoke-test.sh | head -n1)
+export COMPOSE_PROFILES="${TEST_PROFILES-${declared:-tools}}"
 
 cleanup() {
   local code=$?
@@ -87,6 +90,11 @@ docker compose --profile '*' down -v --remove-orphans --timeout 5 >/dev/null 2>&
 step "building and starting (waiting up to ${WAIT_TIMEOUT}s for healthchecks)"
 docker compose up -d --build --wait --wait-timeout "$WAIT_TIMEOUT"
 docker compose ps --format 'table {{.Service}}\t{{.Status}}\t{{.Ports}}'
+if docker compose config --format json | grep -q '"build"'; then
+  step "image sizes"
+  docker compose images --format 'table {{.Service}}\t{{.Repository}}:{{.Tag}}\t{{.Size}}' 2>/dev/null ||
+    docker compose images
+fi
 
 step "running smoke test"
 ./smoke-test.sh
