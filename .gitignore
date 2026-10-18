@@ -34,3 +34,6 @@ Thumbs.db
 
 # Local tooling output
 .playwright-mcp/
+
+# Next.js generated type file
+next-env.d.ts

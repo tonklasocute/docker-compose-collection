@@ -1,0 +1,11 @@
+# Keep the build context small and free of secrets
+.env
+.env.*
+.git
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+*.md
+Dockerfile
+.dockerignore
