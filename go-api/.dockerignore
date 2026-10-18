@@ -1,0 +1,14 @@
+# Keep the build context small and free of secrets
+.env
+.env.*
+!.env.example
+.git
+tmp/
+bin/
+*.md
+Makefile
+smoke-test.sh
+compose.yaml
+Dockerfile
+.dockerignore
+migrations/
