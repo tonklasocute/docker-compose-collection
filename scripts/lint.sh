@@ -47,16 +47,21 @@ check_structure() {
 check_compose() {
   section "Compose files"
   for t in "${TEMPLATES[@]}"; do
-    local f="$t/compose.yaml" bad=0
+    local f="$t/compose.yaml" bad=0 out
+    local dc=(docker compose --project-directory "$t" -f "$f" --env-file "$t/.env.example" --profile '*')
     if grep -qE '^version:' "$f"; then fail "$f: remove the obsolete top-level 'version:' key"; bad=1; fi
-    while read -r img; do
-      if [[ "$img" != *:* || "$img" == *:latest || "$img" == *\$\{* ]]; then
-        fail "$f: image '$img' must be pinned to an explicit version"; bad=1
-      fi
-    done < <(sed -nE 's/^[[:space:]]+image:[[:space:]]*"?([^"#[:space:]]+)"?.*/\1/p' "$f")
-    if ! out=$(docker compose --project-directory "$t" -f "$f" --env-file "$t/.env.example" \
-      --profile '*' config --quiet 2>&1); then
+    # Images must be literal tags in the file (Dependabot updates them there)...
+    if grep -qE '^[[:space:]]+image:.*\$\{' "$f"; then fail "$f: don't build image tags from variables"; bad=1; fi
+    if ! out=$("${dc[@]}" config --quiet 2>&1); then
       fail "$f: docker compose config failed"; printf '      %s\n' "${out//$'\n'/$'\n      '}"; bad=1
+    else
+      # ...and every resolved image (built ones excluded) needs an explicit version
+      while read -r img; do
+        [[ "$img" == "${COMPOSE_PROJECT_NAME:-$t}"-* || "$img" == "$t"-* ]] && continue
+        if [[ "${img##*/}" != *:* || "$img" == *:latest ]]; then
+          fail "$f: image '$img' must be pinned to an explicit version"; bad=1
+        fi
+      done < <("${dc[@]}" config --images)
     fi
     [[ $bad -eq 0 ]] && ok "$t"
   done
