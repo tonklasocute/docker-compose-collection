@@ -7,8 +7,9 @@ on:
   push:
     branches: [main]
     paths-ignore: ["**.md", "LICENSE"]
+  # Every PR runs the tests: "test result" below is a required check, and a
+  # skipped workflow would leave docs-only PRs waiting for it forever
   pull_request:
-    paths-ignore: ["**.md", "LICENSE"]
   schedule:
     # Weekly, to catch upstream images that changed behaviour under a pinned tag
     - cron: "17 4 * * 1"
@@ -77,6 +78,21 @@ jobs:
           name: result-${{ matrix.template }}
           path: result/
           retention-days: 1
+
+  # One stable check for branch protection, however many templates there are
+  result:
+    name: test result
+    needs: [templates, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: All templates passed
+        env:
+          TEMPLATES: ${{ needs.templates.result }}
+          TESTS: ${{ needs.test.result }}
+        run: |
+          echo "templates: $TEMPLATES, test matrix: $TESTS"
+          [[ "$TEMPLATES" == success && "$TESTS" == success ]]
 
   # One shields.io badge per template, published as JSON to the `badges`
   # branch (README: img.shields.io/endpoint?url=.../badges/<template>.json)
