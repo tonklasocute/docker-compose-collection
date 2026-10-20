@@ -41,11 +41,11 @@ check "title was trimmed by the DTO" grep -q '"title":"smoke test"' <<<"$created
 
 check "first GET is a cache MISS (read from postgres)" sh -c "test \"\$($(declare -f x_cache dev_null); x_cache '$API/api/v1/notes/$id')\" = MISS"
 check "second GET is a cache HIT (served by redis)" sh -c "test \"\$($(declare -f x_cache dev_null); x_cache '$API/api/v1/notes/$id')\" = HIT"
-check "PATCH updates the note" sh -c "$(declare -f expect); expect 200 -X PATCH '$API/api/v1/notes/$id' -d '{\"title\":\"edited\"}' | grep -q '\"title\":\"edited\"'"
+check "PATCH updates the note" bash -c "$(declare -f expect); expect 200 -X PATCH '$API/api/v1/notes/$id' -d '{\"title\":\"edited\"}' | grep -q '\"title\":\"edited\"'"
 check "PATCH invalidated the cache (MISS again, new title)" sh -c "
   test \"\$($(declare -f x_cache dev_null); x_cache '$API/api/v1/notes/$id')\" = MISS &&
   curl -fsS '$API/api/v1/notes/$id' | grep -q '\"title\":\"edited\"'"
-check "GET /api/v1/notes lists it" sh -c "$(declare -f expect); expect 200 '$API/api/v1/notes?limit=10' | grep -q '\"title\":\"edited\"'"
+check "GET /api/v1/notes lists it" bash -c "$(declare -f expect); expect 200 '$API/api/v1/notes?limit=10' | grep -q '\"title\":\"edited\"'"
 check "validation: empty title -> 400" expect 400 -X POST "$API/api/v1/notes" -d '{"title":"   "}'
 check "validation: unknown field -> 400" expect 400 -X POST "$API/api/v1/notes" -d '{"title":"a","admin":true}'
 check "validation: non-numeric id -> 400" expect 400 "$API/api/v1/notes/abc"

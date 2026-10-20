@@ -51,14 +51,22 @@ if running kafka-ui; then
     code=$(curl -s --max-time 10 -w '\n%{http_code}' "$base/api/clusters" | tail -n1)
     [[ "$code" == 302 || "$code" == 401 ]] || { echo "got HTTP $code"; return 1; }
   }
+  # A successful login redirects to / (relative or absolute URL), a failed one
+  # to /login?error. Diagnostics go to stderr: stdout is discarded below.
   ui_login() {
     local headers
-    headers=$(curl -s --max-time 10 -D - \
-      --data-urlencode "username=$(env_value KAFKA_UI_USER)" \
-      --data-urlencode "password=$(env_value KAFKA_UI_PASSWORD)" "$base/login")
-    grep -qi '^location: /\r\?$' <<<"$headers" || { echo "$headers"; return 1; }
-    SESSION=$(sed -n 's/^set-cookie: \(SESSION=[^;]*\).*/\1/Ip' <<<"$headers")
-    [[ -n "$SESSION" ]]
+    for _ in 1 2 3 4 5; do
+      headers=$(curl -s --max-time 10 -D - \
+        --data-urlencode "username=$(env_value KAFKA_UI_USER)" \
+        --data-urlencode "password=$(env_value KAFKA_UI_PASSWORD)" "$base/login")
+      if grep -Eqi '^location: (https?://[^/]+)?/'$'\r''?$' <<<"$headers"; then
+        SESSION=$(sed -n 's/^set-cookie: \(SESSION=[^;]*\).*/\1/Ip' <<<"$headers")
+        [[ -n "$SESSION" ]] && return 0
+      fi
+      sleep 2
+    done
+    echo "$headers" >&2
+    return 1
   }
   ui_cluster_online() {
     local body

@@ -38,8 +38,8 @@ echo "  ✓ POST /api/v1/todos creates todo #$id"
 
 check "GET /api/v1/todos/$id returns it" expect 200 "$API/api/v1/todos/$id"
 check "PATCH /api/v1/todos/$id marks it done" \
-  sh -c "$(declare -f req expect); expect 200 -X PATCH '$API/api/v1/todos/$id' -d '{\"done\":true}' | grep -q '\"done\":true'"
-check "GET /api/v1/todos lists it" sh -c "$(declare -f req expect); expect 200 '$API/api/v1/todos' | grep -q '\"id\":$id'"
+  bash -c "$(declare -f req expect); expect 200 -X PATCH '$API/api/v1/todos/$id' -d '{\"done\":true}' | grep -q '\"done\":true'"
+check "GET /api/v1/todos lists it" bash -c "$(declare -f req expect); expect 200 '$API/api/v1/todos' | grep -q '\"id\":$id'"
 check "invalid input is rejected with 422" expect 422 -X POST "$API/api/v1/todos" -d '{"title":"  "}'
 check "DELETE /api/v1/todos/$id returns 204" expect 204 -X DELETE "$API/api/v1/todos/$id"
 check "GET after delete returns 404" expect 404 "$API/api/v1/todos/$id"

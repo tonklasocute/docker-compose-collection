@@ -27,7 +27,7 @@ expect() {
 headers() { curl -s --max-time 10 -D - "$@" | tr -d '\r' | sed '/^$/q'; }
 
 check "nginx answers /nginx-health" expect 200 "$BASE/nginx-health"
-check "/api/health is routed to the Go API" sh -c "$(declare -f expect); expect 200 '$BASE/api/health' | grep -q '\"db\":\"ok\"'"
+check "/api/health is routed to the Go API" bash -c "$(declare -f expect); expect 200 '$BASE/api/health' | grep -q '\"db\":\"ok\"'"
 
 page=$(expect 200 "$BASE/") || { echo "  ✗ GET / : $page"; exit 1; }
 echo "  ✓ GET / is server-rendered by Next.js"
@@ -54,7 +54,7 @@ check "security headers are set and the nginx version is hidden" sh -c "
 
 asset=$(grep -o '/_next/static/[^"]*\.css' <<<"$page" | head -n1)
 check "static assets are served with immutable caching ($asset)" \
-  sh -c "$(declare -f headers); headers '$BASE$asset' | grep -qi '^cache-control:.*immutable'"
+  bash -c "$(declare -f headers); headers '$BASE$asset' | grep -qi '^cache-control:.*immutable'"
 
 check "nginx is the only service with a published port" sh -c '
   test "$(docker compose ps --format "{{.Service}} {{.Ports}}" | grep -- "->" | cut -d" " -f1)" = nginx'

@@ -23,7 +23,7 @@ check "setup container finished successfully" \
   sh -c 'docker compose ps -a --format "{{.Service}} {{.State}} {{.ExitCode}}" setup | grep -qx "setup exited 0"'
 
 check "cluster health is green or yellow over HTTPS" \
-  sh -c "$(declare -f es); es /_cluster/health | grep -Eq '\"status\":\"(green|yellow)\"'"
+  bash -c "$(declare -f es); es /_cluster/health | grep -Eq '\"status\":\"(green|yellow)\"'"
 
 check "anonymous requests are rejected (401)" \
   docker compose exec -T elasticsearch sh -c \
@@ -32,7 +32,7 @@ check "anonymous requests are rejected (401)" \
 check "plain HTTP is refused (TLS only)" \
   docker compose exec -T elasticsearch sh -c '! curl -fs http://localhost:9200 >/dev/null 2>&1'
 
-check "index a document and find it with a search" sh -c "$(declare -f es)
+check "index a document and find it with a search" bash -c "$(declare -f es)
   es '/smoke-test/_doc/1?refresh=true' \"-X PUT -H Content-Type:application/json -d {\\\"msg\\\":\\\"hello-smoke\\\"}\" | grep -q '\"result\":\"created\"' &&
   es '/smoke-test/_search?q=msg:hello-smoke' | grep -q '\"value\":1' &&
   es '/smoke-test' '-X DELETE' | grep -q acknowledged"
