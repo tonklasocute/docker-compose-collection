@@ -1,0 +1,57 @@
+{
+  "realm": "demo",
+  "displayName": "Demo",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      {"name": "user", "description": "Regular user"},
+      {"name": "admin", "description": "Application administrator"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "demo-app",
+      "name": "Demo web app (public, PKCE)",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      }
+    },
+    {
+      "clientId": "demo-service",
+      "name": "Demo backend (confidential, client credentials)",
+      "publicClient": false,
+      "secret": "${DEMO_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "demo",
+      "email": "demo@example.com",
+      "firstName": "Demo",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{"type": "password", "value": "${DEMO_USER_PASSWORD}", "temporary": false}],
+      "realmRoles": ["default-roles-demo", "user"]
+    },
+    {
+      "username": "service-account-demo-service",
+      "enabled": true,
+      "serviceAccountClientId": "demo-service",
+      "realmRoles": ["default-roles-demo"]
+    }
+  ]
+}

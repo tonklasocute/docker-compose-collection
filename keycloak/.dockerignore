@@ -1,0 +1,3 @@
+# The image only needs the Dockerfile; keep everything else out of the context
+*
+!Dockerfile
