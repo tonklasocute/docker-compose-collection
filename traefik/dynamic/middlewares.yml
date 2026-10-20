@@ -1,0 +1,22 @@
+# Dynamic configuration, reloaded on change (providers.file.watch).
+# Applied to every HTTPS router by the websecure entrypoint (see compose.yaml).
+
+http:
+  middlewares:
+    secure-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: strict-origin-when-cross-origin
+        # Don't advertise the upstream server software
+        customResponseHeaders:
+          Server: ""
+          X-Powered-By: ""
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: false

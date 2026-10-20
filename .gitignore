@@ -21,6 +21,9 @@ bin/
 
 # CA certificates exported for host clients (e.g. `make ca` in elasticsearch/)
 *.crt
+# Local TLS certificates and keys (e.g. mkcert output for traefik/)
+traefik/certs/
+*-key.pem
 
 # OS / editor
 .DS_Store

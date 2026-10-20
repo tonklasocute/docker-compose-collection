@@ -1,0 +1,32 @@
+# Test fixture, layered on compose.yaml by scripts/test-template.sh:
+#   docker compose -f compose.yaml -f compose.test.yaml --profile demo up -d --wait
+#
+# Pebble is Let's Encrypt's ACME test server. Pointing Traefik at it exercises
+# the real certificate flow (account, order, challenge, issuance) offline and
+# without touching Let's Encrypt's rate limits.
+
+services:
+  pebble:
+    image: ghcr.io/letsencrypt/pebble:2.10.1
+    environment:
+      PEBBLE_VA_ALWAYS_VALID: "1"   # skip challenge validation: no public DNS here
+      PEBBLE_WFE_NONCEREJECT: "0"   # don't reject random nonces (slows tests)
+    volumes:
+      # The image's test CA is copied into this empty volume on first start,
+      # so Traefik can trust Pebble's HTTPS API
+      - pebble-certs:/test/certs
+    # No healthcheck: a scratch image with no shell; Traefik retries ACME
+    networks: [proxy]
+
+  traefik:
+    depends_on:
+      pebble:
+        condition: service_started
+    environment:
+      TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_CASERVER: https://pebble:14000/dir
+      LEGO_CA_CERTIFICATES: /pebble-certs/pebble.minica.pem
+    volumes:
+      - pebble-certs:/pebble-certs:ro
+
+volumes:
+  pebble-certs:

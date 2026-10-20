@@ -1,0 +1,127 @@
+# Traefik v3 reverse proxy: HTTPS for every container that opts in with
+# labels, certificates from Let's Encrypt, HTTP -> HTTPS redirect.
+#
+#   cp .env.example .env                     # set DOMAIN, ACME_EMAIL, dashboard login
+#   docker compose up -d --wait              # traefik + socket-proxy
+#   docker compose --profile demo up -d --wait   # + whoami at https://whoami.$DOMAIN
+#
+# Static configuration is passed as TRAEFIK_* environment variables (one per
+# CLI flag), so .env or an override file can change any single setting.
+
+services:
+  # Traefik only needs to *read* container metadata. This proxy exposes just
+  # that part of the Docker API, so the socket itself never reaches Traefik.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1   # GET /containers/*; every other section and all POSTs stay denied
+      EVENTS: 1       # default, listed for clarity: Traefik watches start/stop events
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2375/_ping | grep -q OK"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+    networks: [socket]
+
+  traefik:
+    image: traefik:v3.7.15
+    restart: unless-stopped
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
+    environment:
+      TRAEFIK_ENTRYPOINTS_WEB_ADDRESS: ":80"
+      TRAEFIK_ENTRYPOINTS_WEB_HTTP_REDIRECTIONS_ENTRYPOINT_TO: websecure
+      TRAEFIK_ENTRYPOINTS_WEB_HTTP_REDIRECTIONS_ENTRYPOINT_SCHEME: https
+      TRAEFIK_ENTRYPOINTS_WEBSECURE_ADDRESS: ":443"
+      # Every router on :443 gets TLS from Let's Encrypt and the security
+      # headers from dynamic/middlewares.yml, without per-app labels
+      TRAEFIK_ENTRYPOINTS_WEBSECURE_HTTP_TLS_CERTRESOLVER: letsencrypt
+      TRAEFIK_ENTRYPOINTS_WEBSECURE_HTTP_MIDDLEWARES: secure-headers@file
+      TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL: ${ACME_EMAIL:-}
+      TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_CASERVER: ${ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_STORAGE: /letsencrypt/acme.json
+      TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_HTTPCHALLENGE_ENTRYPOINT: web
+      TRAEFIK_PROVIDERS_DOCKER_ENDPOINT: tcp://socket-proxy:2375
+      # Containers are only routed with the label traefik.enable=true
+      TRAEFIK_PROVIDERS_DOCKER_EXPOSEDBYDEFAULT: "false"
+      TRAEFIK_PROVIDERS_DOCKER_NETWORK: ${PROXY_NETWORK:-traefik-proxy}
+      TRAEFIK_PROVIDERS_FILE_DIRECTORY: /etc/traefik/dynamic
+      TRAEFIK_PROVIDERS_FILE_WATCH: "true"
+      TRAEFIK_API_DASHBOARD: "true"
+      TRAEFIK_PING: "true"
+      TRAEFIK_LOG_LEVEL: ${TRAEFIK_LOG_LEVEL:-INFO}
+      TRAEFIK_ACCESSLOG: "true"
+      TRAEFIK_GLOBAL_CHECKNEWVERSION: "false"
+      TRAEFIK_GLOBAL_SENDANONYMOUSUSAGE: "false"
+    ports:
+      # 127.0.0.1 by default, so nothing is exposed by accident. On a server,
+      # set TRAEFIK_BIND_IP=0.0.0.0: Let's Encrypt must reach port 80.
+      - "${TRAEFIK_BIND_IP:-127.0.0.1}:80:80"
+      - "${TRAEFIK_BIND_IP:-127.0.0.1}:443:443"
+    volumes:
+      - letsencrypt:/letsencrypt
+      - ./dynamic:/etc/traefik/dynamic:ro
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.dashboard.rule: Host(`traefik.${DOMAIN:-localhost}`)
+      traefik.http.routers.dashboard.service: api@internal
+      traefik.http.routers.dashboard.middlewares: dashboard-auth
+      traefik.http.middlewares.dashboard-auth.basicauth.users: ${TRAEFIK_DASHBOARD_USERS:?run make htpasswd and set it in .env}
+    # Root inside the container (it owns acme.json) but with no capabilities;
+    # ports 80/443 bind without CAP_NET_BIND_SERVICE in Docker 20.10+
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    networks: [proxy, socket]
+
+  # Demo backend: echoes the request it receives. No Docker healthcheck (it's a
+  # scratch image with nothing to run one); Traefik health-checks it instead
+  # and stops routing to it if /health fails.
+  whoami:
+    image: traefik/whoami:v1.12.0
+    profiles: [demo]
+    restart: unless-stopped
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.whoami.rule: Host(`whoami.${DOMAIN:-localhost}`)
+      traefik.http.services.whoami.loadbalancer.server.port: "80"
+      traefik.http.services.whoami.loadbalancer.healthcheck.path: /health
+      traefik.http.services.whoami.loadbalancer.healthcheck.interval: 10s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 32m
+    networks: [proxy]
+
+volumes:
+  # acme.json: the Let's Encrypt account key and every issued certificate
+  letsencrypt:
+
+networks:
+  # Fixed name, so other compose projects can join it as an external network
+  proxy:
+    name: ${PROXY_NETWORK:-traefik-proxy}
+  # Traefik <-> socket-proxy only; no route outside
+  socket:
+    internal: true
