@@ -47,11 +47,16 @@ check_structure() {
 check_compose() {
   section "Compose files"
   for t in "${TEMPLATES[@]}"; do
-    local f="$t/compose.yaml" bad=0 out
-    local dc=(docker compose --project-directory "$t" -f "$f" --env-file "$t/.env.example" --profile '*')
-    if grep -qE '^version:' "$f"; then fail "$f: remove the obsolete top-level 'version:' key"; bad=1; fi
-    # Images must be literal tags in the file (Dependabot updates them there)...
-    if grep -qE '^[[:space:]]+image:.*\$\{' "$f"; then fail "$f: don't build image tags from variables"; bad=1; fi
+    local f="$t/compose.yaml" bad=0 out c files=("$t/compose.yaml")
+    # The optional test overlay is validated together with the main file
+    [[ -f "$t/compose.test.yaml" ]] && files+=("$t/compose.test.yaml")
+    local dc=(docker compose --project-directory "$t" --env-file "$t/.env.example" --profile '*')
+    for c in "${files[@]}"; do
+      dc+=(-f "$c")
+      if grep -qE '^version:' "$c"; then fail "$c: remove the obsolete top-level 'version:' key"; bad=1; fi
+      # Images must be literal tags in the file (Dependabot updates them there)...
+      if grep -qE '^[[:space:]]+image:.*\$\{' "$c"; then fail "$c: don't build image tags from variables"; bad=1; fi
+    done
     if ! out=$("${dc[@]}" config --quiet 2>&1); then
       fail "$f: docker compose config failed"; printf '      %s\n' "${out//$'\n'/$'\n      '}"; bad=1
     else

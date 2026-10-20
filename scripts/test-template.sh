@@ -2,6 +2,7 @@
 # Test one template end to end, the same way a user would run it:
 #
 #   1. copy the template into a scratch dir and create .env from .env.example
+#      (plus compose.test.yaml, if the template has one: test-only fixtures)
 #   2. docker compose config     (static validation)
 #   3. docker compose up --wait  (every service must report healthy)
 #   4. ./smoke-test.sh           (functional check, e.g. SELECT 1, PING, /health)
@@ -22,7 +23,7 @@ KEEP="${KEEP:-0}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-300}"
 
 if [[ -z "$NAME" || "$NAME" == "-h" || "$NAME" == "--help" ]]; then
-  sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 fi
 
@@ -52,6 +53,11 @@ cd "$WORK"
 export MSYS_NO_PATHCONV=1
 
 export COMPOSE_PROJECT_NAME="dcc-test-$NAME"
+# Test fixtures (a mock API, a fake ACME server, ...) live in an optional
+# overlay, so compose.yaml itself stays free of test-only services
+if [[ -f compose.test.yaml ]]; then
+  export COMPOSE_FILE=compose.yaml:compose.test.yaml COMPOSE_PATH_SEPARATOR=:
+fi
 # Profiles to test: TEST_PROFILES, else a "# test-profiles: a,b" line in the
 # template's smoke-test.sh, else "tools"
 declared=$(sed -n 's/^# test-profiles: *//p' smoke-test.sh | head -n1)

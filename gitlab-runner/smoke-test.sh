@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Smoke test against the running stack (`make up` first).
 #
-# With the mock-gitlab service running (profile: test), it also registers the
-# runner against that fake GitLab API and runs one real job through the
-# Docker executor:  docker compose --profile test up -d --wait && make test
-# test-profiles: test
+# With the mock-gitlab service from compose.test.yaml running, it also
+# registers the runner against that fake GitLab API and runs one real job
+# through the Docker executor:
+#   docker compose -f compose.yaml -f compose.test.yaml up -d --wait && make test
 # shellcheck disable=SC2016  # $VARS in single quotes expand in the sh -c child
 set -euo pipefail
 cd "$(dirname "$0")"

@@ -39,24 +39,6 @@ services:
           memory: 256m
     networks: [runner]
 
-  # Fake GitLab API for smoke-test.sh only: lets the test register the runner
-  # and run one real job through the Docker executor without a GitLab server.
-  mock-gitlab:
-    image: python:3.14.8-alpine3.24
-    profiles: [test]
-    command: ["python", "-u", "/mock/mock-gitlab.py"]
-    environment:
-      JOB_IMAGE: ${RUNNER_DEFAULT_IMAGE:-alpine:3.24.2}
-    volumes:
-      - ./test:/mock:ro
-    user: "65534:65534"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/-/health')"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks: [runner]
-
 volumes:
   runner-config:
 

@@ -1,0 +1,22 @@
+# Test fixture, layered on compose.yaml by scripts/test-template.sh:
+#   docker compose -f compose.yaml -f compose.test.yaml up -d --wait
+#
+# A fake GitLab API (test/mock-gitlab.py), so the smoke test can register the
+# runner and run one real job through the Docker executor without a GitLab
+# server.
+
+services:
+  mock-gitlab:
+    image: python:3.14.8-alpine3.24
+    command: ["python", "-u", "/mock/mock-gitlab.py"]
+    environment:
+      JOB_IMAGE: ${RUNNER_DEFAULT_IMAGE:-alpine:3.24.2}
+    volumes:
+      - ./test:/mock:ro
+    user: "65534:65534"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/-/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [runner]

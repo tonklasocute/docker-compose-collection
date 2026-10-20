@@ -21,12 +21,12 @@ test:
 
 ## Services
 
-| Service       | Image                                 | Host port                   | Profile   |
-|---------------|---------------------------------------|-----------------------------|-----------|
-| `runner`      | `gitlab/gitlab-runner:alpine-v19.5.0` | `127.0.0.1:9252` (metrics)  | (default) |
-| `mock-gitlab` | `python:3.14.8-alpine3.24`            | – (internal)                | `test`    |
+| Service       | Image                                 | Host port                   | Defined in          |
+|---------------|---------------------------------------|-----------------------------|---------------------|
+| `runner`      | `gitlab/gitlab-runner:alpine-v19.5.0` | `127.0.0.1:9252` (metrics)  | `compose.yaml`      |
+| `mock-gitlab` | `python:3.14.8-alpine3.24`            | – (internal)                | `compose.test.yaml` |
 
-`mock-gitlab` is not part of a normal setup. It's a 130-line fake of the GitLab API ([`test/mock-gitlab.py`](test/mock-gitlab.py)) that the smoke test uses to register the runner and run a real job without a GitLab server.
+`mock-gitlab` is a test fixture, not part of a normal setup. It's a 130-line fake of the GitLab API ([`test/mock-gitlab.py`](test/mock-gitlab.py)) that the smoke test uses to register the runner and run a real job without a GitLab server.
 
 ## Environment variables
 
@@ -88,7 +88,7 @@ Job caches are Docker volumes named `runner-*-cache-*` on the host. Clean them w
 ## Smoke test
 
 ```bash
-docker compose --profile test up -d --wait
+docker compose -f compose.yaml -f compose.test.yaml up -d --wait
 make test
 ```
 
@@ -113,7 +113,8 @@ gitlab-runner/
 ├── compose.yaml
 ├── .env.example
 ├── register.sh           # gitlab-runner register (docker executor) + concurrent
-├── test/mock-gitlab.py   # fake GitLab API for the smoke test (profile: test)
+├── compose.test.yaml     # test fixture: mock-gitlab (used by scripts/test-template.sh)
+├── test/mock-gitlab.py   # fake GitLab API for the smoke test
 ├── Makefile              # up, register, verify, config, unregister, down, logs, ps, reset, test
 └── smoke-test.sh
 ```
