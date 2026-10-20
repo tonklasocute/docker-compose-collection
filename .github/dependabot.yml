@@ -1,5 +1,9 @@
 # Keeps pinned versions current: every PR is tested by the test workflow
 # before it can be merged.
+#
+# Major versions are ignored: a new major (PostgreSQL 18, Node 26,
+# Elasticsearch 9, ...) changes data layouts, APIs or defaults, so it's an
+# upgrade done by hand, with the template's README and tests updated together.
 version: 2
 
 updates:
@@ -12,6 +16,12 @@ updates:
       compose-images:
         patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # Tags like 1.0.2-20-alpine3.19 are misread (1-18 looks newer than
+      # 1.0.2-20, which would be a downgrade): update mongo-express by hand
+      - dependency-name: mongo-express
 
   # FROM lines in Dockerfiles (go-api, node-api, keycloak, logging/loki, fullstack/*)
   - package-ecosystem: docker
@@ -22,6 +32,9 @@ updates:
       base-images:
         patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: gomod
     directories: ["/go-api", "/fullstack/api"]
@@ -30,6 +43,9 @@ updates:
     groups:
       go-modules:
         patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directories: ["/node-api", "/fullstack/web"]
@@ -39,6 +55,9 @@ updates:
       npm-minor-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"

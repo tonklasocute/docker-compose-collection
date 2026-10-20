@@ -43,4 +43,4 @@ A new template is a folder with:
 
 ## Upgrading an image
 
-Dependabot opens weekly PRs for compose images, Dockerfiles, Go and npm modules, and GitHub Actions. The test workflow runs on each one. For a **major** upgrade, read the upstream release notes and check the template's README (versions, behaviour, troubleshooting) as well as the tag.
+Dependabot opens weekly PRs for minor and patch updates of compose images, Dockerfiles, Go and npm modules, and for GitHub Actions. The test workflow runs on each one. **Major** versions are ignored on purpose (see `.github/dependabot.yml`). Upgrade those by hand in their own PR: read the upstream release notes, migrate data or config if needed, and update the template's README (versions, behaviour, troubleshooting) along with the tag.
