@@ -17,7 +17,7 @@ Add RedisInsight with `make tools` (or `docker compose --profile tools up -d --w
 | Service        | Image                      | Host port              | Profile   |
 |----------------|----------------------------|------------------------|-----------|
 | `redis`        | `redis:7.4.11-alpine3.21`  | `127.0.0.1:6379`       | (default) |
-| `redisinsight` | `redis/redisinsight:3.4.2` | `127.0.0.1:5540` (web) | `tools`   |
+| `redisinsight` | `redis/redisinsight:3.8.0` | `127.0.0.1:5540` (web) | `tools`   |
 
 ## Environment variables
 

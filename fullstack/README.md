@@ -34,7 +34,7 @@ Open http://localhost:8080.
 
 | Service    | Image / build                                         | Exposed               | Size (uncompressed / pull) |
 |------------|-------------------------------------------------------|-----------------------|----------------------------|
-| `nginx`    | `nginxinc/nginx-unprivileged:1.30.6-alpine3.24`       | `127.0.0.1:8080`      | upstream image             |
+| `nginx`    | `nginxinc/nginx-unprivileged:1.31.6-alpine3.24`       | `127.0.0.1:8080`      | upstream image             |
 | `web`      | `web/Dockerfile` (Next.js 16 standalone, Node 24)     | internal `:3000`      | **~188 MB / 75 MB**        |
 | `api`      | `api/Dockerfile` (Go, distroless static)              | internal `:8080`      | **~13 MB / 5.2 MB**        |
 | `migrate`  | `migrate/migrate:v4.20.1`                             | – (runs once)         | upstream image             |
