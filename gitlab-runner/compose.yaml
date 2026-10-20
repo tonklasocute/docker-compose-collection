@@ -1,0 +1,64 @@
+# GitLab Runner (Docker executor)
+#
+#   cp .env.example .env              # then set GITLAB_URL and RUNNER_TOKEN
+#   docker compose up -d --wait       # start the runner
+#   ./register.sh                     # register it with your GitLab
+#
+# Jobs run as sibling containers on this host's Docker daemon (socket mount),
+# not inside the runner container. See README.md, "Security".
+
+services:
+  runner:
+    image: gitlab/gitlab-runner:alpine-v19.5.0
+    restart: unless-stopped
+    # The image's default command, plus a Prometheus metrics endpoint that
+    # also serves as the healthcheck
+    command:
+      - run
+      - --user=gitlab-runner
+      - --working-directory=/home/gitlab-runner
+      - --listen-address=:9252
+    volumes:
+      # config.toml (with the runner's authentication token) lives here
+      - runner-config:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      # Metrics for Prometheus, reachable from this machine only
+      - "127.0.0.1:${RUNNER_METRICS_PORT:-9252}:9252"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9252/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    # Limits the runner process only; job containers are started by the host
+    # daemon and are limited per job (see RUNNER_JOB_MEMORY in .env.example)
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    networks: [runner]
+
+  # Fake GitLab API for smoke-test.sh only: lets the test register the runner
+  # and run one real job through the Docker executor without a GitLab server.
+  mock-gitlab:
+    image: python:3.14.8-alpine3.24
+    profiles: [test]
+    command: ["python", "-u", "/mock/mock-gitlab.py"]
+    environment:
+      JOB_IMAGE: ${RUNNER_DEFAULT_IMAGE:-alpine:3.24.2}
+    volumes:
+      - ./test:/mock:ro
+    user: "65534:65534"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/-/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [runner]
+
+volumes:
+  runner-config:
+
+networks:
+  runner:
