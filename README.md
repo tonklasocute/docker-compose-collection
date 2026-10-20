@@ -95,7 +95,7 @@ Every template follows the same rules. CI enforces the ones a script can check.
 - Ports bind to **`127.0.0.1`**. Each one has a comment explaining how to expose it, and most smoke tests check the binding. Internal-only databases (keycloak, fullstack) aren't published at all.
 - App containers run as **non-root**, with `read_only: true`, `cap_drop: [ALL]` and `no-new-privileges` where the app allows it. The smoke tests check this too.
 - No default passwords that work out of the box in production: every example password is `change-me-...`.
-- The Docker socket is only mounted where it's the point of the template (GitLab Runner, Alloy, and cAdvisor via `/var/run`), and Traefik reads it through a read-only proxy.
+- The Docker socket is only mounted where it's the point of the template (GitLab Runner, Alloy, cAdvisor), and Traefik reads it through a read-only proxy.
 
 **Profiles**
 - `tools`: optional admin UIs. `dev`: hot-reload variants of app services. `demo`: example backends (Traefik's whoami). A plain `docker compose up` starts only what an app needs.

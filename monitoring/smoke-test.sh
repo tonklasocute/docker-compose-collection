@@ -30,12 +30,22 @@ all_targets_up() {
   return 1
 }
 
+# cAdvisor finds new containers on its 15s housekeeping cycle, and Prometheus
+# scrapes it every 15s: the first scrape can predate the containers
+container_metrics() {
+  for _ in $(seq 1 20); do
+    promql 'container_memory_working_set_bytes{container_label_com_docker_compose_service="prometheus"}' |
+      grep -q '"value"' && return 0
+    sleep 3
+  done
+  return 1
+}
+
 check "Prometheus is ready" curl -fsS --max-time 10 "$PROM/-/ready"
 check "all 4 scrape targets are up (prometheus, node, cadvisor, grafana)" all_targets_up
 check "node-exporter metrics are in Prometheus" \
   sh -c "curl -fsS -G --data-urlencode 'query=node_memory_MemTotal_bytes' '$PROM/api/v1/query' | grep -q '\"value\"'"
-check "cAdvisor reports per-container metrics with compose labels" \
-  sh -c "curl -fsS -G --data-urlencode 'query=container_memory_working_set_bytes{container_label_com_docker_compose_service=\"prometheus\"}' '$PROM/api/v1/query' | grep -q '\"value\"'"
+check "cAdvisor reports per-container metrics with compose labels" container_metrics
 check "alert rules are loaded" sh -c "curl -fsS '$PROM/api/v1/rules' | grep -q '\"name\":\"TargetDown\"'"
 
 check "Grafana /api/health reports database ok" \

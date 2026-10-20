@@ -103,7 +103,11 @@ services:
       - /dev/kmsg
     volumes:
       - /:/rootfs:ro
-      - /var/run:/var/run:ro
+      # The Docker API socket itself rather than all of /var/run (Docker Desktop
+      # doesn't forward sockets through a /var/run mount), plus containerd's,
+      # which cAdvisor needs with Docker's containerd image store
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/containerd:/run/containerd:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro

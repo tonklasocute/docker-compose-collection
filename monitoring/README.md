@@ -100,7 +100,7 @@ On Docker Desktop (macOS and Windows), the "host" that node-exporter and cAdviso
 |---|---|
 | `path / is mounted on / but it is not a shared or slave mount` | You added `rslave` on Docker Desktop. Remove it there. |
 | A target shows `DOWN` at http://localhost:9090/targets | Is the service on the `monitoring` network, and does `/metrics` answer on that port? |
-| Container panels are empty | cAdvisor needs `privileged` and the `/var/lib/docker` + `/sys` mounts. On rootless or Podman setups, paths differ. |
+| Container panels are empty | cAdvisor needs `privileged`, the `/var/lib/docker` + `/sys` mounts, and both the Docker and containerd sockets. `docker compose logs cadvisor` shows `Registration of the docker container factory failed` when a socket is missing. On rootless or Podman setups, paths differ. |
 | Grafana login fails after changing `.env` | The admin password is set on first start only. Run `docker compose exec grafana grafana cli admin reset-admin-password <new>`. |
 | Dashboard edits are lost | Provisioned dashboards are read-only. Edit `grafana/dashboards/*.json`. |
 
