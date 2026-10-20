@@ -5,7 +5,7 @@
 #   build   next build with output: 'standalone'
 #   runner  only the standalone server + static assets, non-root, no npm
 
-FROM node:24.22.0-alpine3.24 AS base
+FROM node:26.12.0-alpine3.24 AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 
