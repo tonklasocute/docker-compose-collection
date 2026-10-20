@@ -10,7 +10,7 @@
 services:
   # One-shot: certificates + generated Kibana credentials. See setup/setup.sh.
   setup:
-    image: elasticsearch:8.19.23
+    image: elasticsearch:9.5.5
     user: "0"
     command: ["bash", "/setup/setup.sh"]
     environment:
@@ -27,7 +27,7 @@ services:
     networks: [elastic]
 
   elasticsearch:
-    image: elasticsearch:8.19.23
+    image: elasticsearch:9.5.5
     restart: unless-stopped
     depends_on:
       setup:
