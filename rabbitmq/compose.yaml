@@ -1,0 +1,58 @@
+# RabbitMQ 4 (management UI + Prometheus metrics) with a pre-declared topology
+#
+#   cp .env.example .env              # then change the password
+#   docker compose up -d --wait       # starts RabbitMQ and imports definitions.json
+#
+# The management UI is a plugin inside the broker image, so it is always on
+# (bound to 127.0.0.1); there is no separate tools container.
+
+services:
+  rabbitmq:
+    image: rabbitmq:4.3.6-management-alpine
+    # The node name (rabbit@<hostname>) names the data directory, so a fixed
+    # hostname keeps the data when the container is re-created
+    hostname: rabbitmq
+    restart: unless-stopped
+    environment:
+      # Created on first start only (an empty volume); there is no guest user
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-app}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-app}
+      # rabbitmqadmin (HTTP API CLI) reads these: used by the post_start hook,
+      # `make admin` and the smoke test
+      RABBITMQADMIN_USERNAME: ${RABBITMQ_USER:-app}
+      RABBITMQADMIN_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQADMIN_TARGET_VHOST: ${RABBITMQ_VHOST:-app}
+      RABBITMQADMIN_NON_INTERACTIVE_MODE: "true"
+    ports:
+      # Reachable from this machine only. To expose them on your network, drop
+      # the "127.0.0.1:" prefix - and use a strong password first.
+      - "127.0.0.1:${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_UI_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./import-definitions.sh:/usr/local/bin/import-definitions.sh:ro
+    # Declares the exchanges, queues and bindings in definitions.json once the
+    # node is up. (Loading definitions at boot instead would skip creating the
+    # default user and vhost above.)
+    post_start:
+      - command: ["sh", "/usr/local/bin/import-definitions.sh"]
+    healthcheck:
+      # Every listener (AMQP, management, metrics) accepts connections
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    networks: [messaging]
+
+volumes:
+  rabbitmq-data:
+
+networks:
+  messaging:

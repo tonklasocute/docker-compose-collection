@@ -1,0 +1,19 @@
+{
+  "exchanges": [
+    {"name": "app.events", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {}},
+    {"name": "app.dlx", "type": "fanout", "durable": true, "auto_delete": false, "internal": false, "arguments": {}}
+  ],
+  "queues": [
+    {
+      "name": "app.events.audit",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {"x-queue-type": "quorum", "x-dead-letter-exchange": "app.dlx", "x-delivery-limit": 5}
+    },
+    {"name": "app.dead-letter", "durable": true, "auto_delete": false, "arguments": {"x-queue-type": "quorum"}}
+  ],
+  "bindings": [
+    {"source": "app.events", "destination": "app.events.audit", "destination_type": "queue", "routing_key": "#", "arguments": {}},
+    {"source": "app.dlx", "destination": "app.dead-letter", "destination_type": "queue", "routing_key": "", "arguments": {}}
+  ]
+}
