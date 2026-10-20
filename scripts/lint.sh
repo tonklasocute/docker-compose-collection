@@ -3,10 +3,14 @@
 #
 #   - every template has the required files
 #   - compose files: no `version:` key, no `latest`/untagged images, valid config
-#   - shellcheck, hadolint, yamllint (local binary if installed, else a pinned
-#     Docker image, so nothing needs to be installed to run this)
+#   - shellcheck, hadolint, yamllint, actionlint, gitleaks (local binary if
+#     installed, else a pinned Docker image, so nothing needs to be installed)
 #
-# Usage: scripts/lint.sh [structure|compose|shell|docker|yaml ...]   (default: all)
+# Usage: scripts/lint.sh [structure|compose|shell|docker|yaml|actions|secrets ...]
+#        (default: all)
+# Environment:
+#   LINT_DOCKER=1   always use the pinned images, even if a local binary exists
+#                   (CI does this, so results don't depend on the runner image)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,6 +19,8 @@ cd "$ROOT"
 SHELLCHECK_IMAGE="koalaman/shellcheck:v0.11.0"
 HADOLINT_IMAGE="hadolint/hadolint:v2.15.1"
 YAMLLINT_IMAGE="pipelinecomponents/yamllint:0.35.27"
+ACTIONLINT_IMAGE="rhysd/actionlint:1.7.12"
+GITLEAKS_IMAGE="ghcr.io/gitleaks/gitleaks:v8.30.1"
 REQUIRED_FILES=(compose.yaml .env.example README.md Makefile smoke-test.sh)
 
 errors=0
@@ -28,10 +34,13 @@ mapfile -t TEMPLATES < <(for d in */compose.yaml; do dirname "$d"; done | sort)
 run_tool() {
   local bin=$1 image=$2
   shift 2
-  if command -v "$bin" >/dev/null 2>&1; then
+  if [[ "${LINT_DOCKER:-0}" != 1 ]] && command -v "$bin" >/dev/null 2>&1; then
     "$bin" "$@"
   else
-    MSYS_NO_PATHCONV=1 docker run --rm -v "$ROOT:/repo" -w /repo --entrypoint "$bin" "$image" "$@"
+    # safe.directory: the mounted repo belongs to another uid than the container's
+    MSYS_NO_PATHCONV=1 docker run --rm -v "$ROOT:/repo" -w /repo \
+      -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+      --entrypoint "$bin" "$image" "$@"
   fi
 }
 
@@ -90,8 +99,23 @@ check_yaml() {
   if run_tool yamllint "$YAMLLINT_IMAGE" --strict -c .yamllint.yaml .; then ok "yaml"; else fail "yamllint"; fi
 }
 
+check_actions() {
+  section "actionlint"
+  if run_tool actionlint "$ACTIONLINT_IMAGE"; then ok "workflows"; else fail "actionlint"; fi
+}
+
+check_secrets() {
+  section "gitleaks (whole git history)"
+  # .gitleaks.toml allow-lists the documented placeholder credentials only
+  if run_tool gitleaks "$GITLEAKS_IMAGE" git --config .gitleaks.toml --no-banner --redact .; then
+    ok "no secrets in history"
+  else
+    fail "gitleaks"
+  fi
+}
+
 checks=("$@")
-[[ ${#checks[@]} -eq 0 ]] && checks=(structure compose shell docker yaml)
+[[ ${#checks[@]} -eq 0 ]] && checks=(structure compose shell docker yaml actions secrets)
 for c in "${checks[@]}"; do "check_$c"; done
 
 echo

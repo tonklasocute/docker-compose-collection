@@ -1,0 +1,112 @@
+name: test
+
+# Runs scripts/test-template.sh for every template: up --wait (all
+# healthchecks green), the template's smoke test, then down -v.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "LICENSE"]
+  pull_request:
+    paths-ignore: ["**.md", "LICENSE"]
+  schedule:
+    # Weekly, to catch upstream images that changed behaviour under a pinned tag
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      templates:
+        description: "Templates to test, space-separated (empty = all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  templates:
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list
+        env:
+          REQUESTED: ${{ inputs.templates }}
+        run: |
+          if [[ -n "${REQUESTED:-}" ]]; then
+            read -ra names <<<"$REQUESTED"
+          else
+            names=()
+            for f in */compose.yaml; do names+=("$(dirname "$f")"); done
+          fi
+          echo "list=$(printf '%s\n' "${names[@]}" | jq -Rnc '[inputs]')" >>"$GITHUB_OUTPUT"
+
+  test:
+    needs: templates
+    name: ${{ matrix.template }}
+    runs-on: ubuntu-latest # 4 vCPU / 16 GB: enough for every template, Elasticsearch + Kibana included
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        template: ${{ fromJSON(needs.templates.outputs.list) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Docker versions
+        run: docker version --format 'Docker {{.Server.Version}}' && docker compose version && free -h
+
+      - name: Test ${{ matrix.template }}
+        env:
+          WAIT_TIMEOUT: "600"
+        run: scripts/test-template.sh "${{ matrix.template }}"
+
+      - name: Record result for the badge
+        if: always()
+        env:
+          RESULT: ${{ job.status }}
+        run: mkdir -p result && echo "$RESULT" >"result/${{ matrix.template }}"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: result-${{ matrix.template }}
+          path: result/
+          retention-days: 1
+
+  # One shields.io badge per template, published as JSON to the `badges`
+  # branch (README: img.shields.io/endpoint?url=.../badges/<template>.json)
+  badges:
+    needs: test
+    if: always() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && !inputs.templates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: result-*
+          merge-multiple: true
+          path: result
+
+      - name: Publish badge JSON to the badges branch
+        env:
+          REPO: ${{ github.repository }}
+          TOKEN: ${{ github.token }}
+        run: |
+          mkdir badges
+          for f in result/*; do
+            t=$(basename "$f")
+            if [[ "$(cat "$f")" == success ]]; then msg=passing color=brightgreen; else msg=failing color=red; fi
+            printf '{"schemaVersion":1,"label":"%s","message":"%s","color":"%s"}\n' "$t" "$msg" "$color" >"badges/$t.json"
+          done
+          cd badges
+          git init -q -b badges
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . && git commit -qm "Update template test badges"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${REPO}.git" badges

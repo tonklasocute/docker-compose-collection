@@ -1,0 +1,48 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Use the linter versions pinned in scripts/lint.sh, not whatever the runner has
+  LINT_DOCKER: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # gitleaks scans the whole history
+
+      - name: Template structure (compose.yaml, .env.example, README, Makefile, smoke test)
+        run: scripts/lint.sh structure
+
+      - name: docker compose config + pinned image versions
+        run: scripts/lint.sh compose
+
+      - name: shellcheck
+        run: scripts/lint.sh shell
+
+      - name: hadolint
+        run: scripts/lint.sh docker
+
+      - name: yamllint
+        run: scripts/lint.sh yaml
+
+      - name: actionlint
+        run: scripts/lint.sh actions
+
+      - name: gitleaks
+        run: scripts/lint.sh secrets

@@ -1,0 +1,15 @@
+# gitleaks config: the default rules, minus the false positives this repo is
+# full of by design. Templates document *example* credentials (change-me-...,
+# RabbitMQ's guest:guest in a "must be rejected" test) and pass real ones as
+# ${VAR} / $(...) references in curl commands. Anything else still fails.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Placeholder credentials and variable references"
+regexTarget = "match"
+regexes = [
+  '''change-me-[a-z0-9-]*''',
+  '''guest:guest''',
+  '''\$[({$]''',
+]

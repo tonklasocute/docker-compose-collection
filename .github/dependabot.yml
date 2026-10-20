@@ -1,0 +1,46 @@
+# Keeps pinned versions current: every PR is tested by the test workflow
+# before it can be merged.
+version: 2
+
+updates:
+  # image: tags in compose.yaml / compose.test.yaml of every template
+  - package-ecosystem: docker-compose
+    directories: ["/*"]
+    schedule:
+      interval: weekly
+    groups:
+      compose-images:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # FROM lines in Dockerfiles (go-api, node-api, keycloak, logging/loki, fullstack/*)
+  - package-ecosystem: docker
+    directories: ["/*", "/fullstack/*"]
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directories: ["/go-api", "/fullstack/api"]
+    schedule:
+      interval: weekly
+    groups:
+      go-modules:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directories: ["/node-api", "/fullstack/web"]
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
