@@ -7,7 +7,7 @@
 #   build  compile to dist/, then drop devDependencies
 #   prod   node + dist + production node_modules, non-root, no npm
 
-FROM node:24.22.0-alpine3.24 AS base
+FROM node:26.12.0-alpine3.24 AS base
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false NPM_CONFIG_FUND=false
 RUN mkdir /app && chown node:node /app
 WORKDIR /app
@@ -33,7 +33,7 @@ FROM deps AS build
 COPY --chown=node:node . .
 RUN npm run build && npm prune --omit=dev
 
-FROM node:24.22.0-alpine3.24 AS prod
+FROM node:26.12.0-alpine3.24 AS prod
 ENV NODE_ENV=production
 WORKDIR /app
 # The app runs with plain `node`; npm, npx, corepack and yarn are dead weight
