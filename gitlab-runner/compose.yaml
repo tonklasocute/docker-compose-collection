@@ -9,7 +9,7 @@
 
 services:
   runner:
-    image: gitlab/gitlab-runner:alpine-v19.5.0
+    image: gitlab/gitlab-runner:alpine-v19.5.1
     restart: unless-stopped
     # The image's default command, plus a Prometheus metrics endpoint that
     # also serves as the healthcheck
