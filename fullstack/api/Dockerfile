@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
       -ldflags="-s -w -X github.com/tonklasocute/docker-compose-collection/fullstack/api/internal/httpapi.Version=${VERSION}" \
       -o /out/api ./cmd/api
 
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:516757106de35205efb70b91ba03f6f1298424a0678c603255cf2852a7000087 AS final
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:18f4cc26c9ffa7f20a359298be7deadac5c607c8e03a02b8119f1a5fc2f82c99 AS final
 COPY --from=build /out/api /app/api
 # Numeric so Kubernetes' runAsNonRoot can verify it (65532 = "nonroot")
 USER 65532:65532
