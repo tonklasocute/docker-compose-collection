@@ -32,7 +32,7 @@ services:
     networks: [logging]
 
   alloy:
-    image: grafana/alloy:v1.20.1
+    image: grafana/alloy:v1.21.3
     restart: unless-stopped
     depends_on:
       loki:
@@ -70,7 +70,7 @@ services:
     networks: [logging]
 
   grafana:
-    image: grafana/grafana:13.2.4
+    image: grafana/grafana:13.3.0
     restart: unless-stopped
     depends_on:
       loki:
