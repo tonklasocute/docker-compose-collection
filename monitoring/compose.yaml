@@ -6,7 +6,7 @@
 
 services:
   prometheus:
-    image: prom/prometheus:v3.15.0
+    image: prom/prometheus:v3.16.0
     restart: unless-stopped
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -32,7 +32,7 @@ services:
     networks: [monitoring]
 
   grafana:
-    image: grafana/grafana:13.2.4
+    image: grafana/grafana:13.3.1
     restart: unless-stopped
     depends_on:
       prometheus:
@@ -66,7 +66,7 @@ services:
   # scrapes it on the internal network. On Docker Desktop the "host" is the
   # Linux VM Docker runs in, not macOS/Windows itself.
   node-exporter:
-    image: prom/node-exporter:v1.12.1
+    image: prom/node-exporter:v1.13.1
     restart: unless-stopped
     command:
       - --path.rootfs=/host
@@ -90,7 +90,7 @@ services:
   # Per-container metrics. Needs read access to the Docker host, hence
   # privileged + the mounts below. Not published.
   cadvisor:
-    image: ghcr.io/google/cadvisor:v0.60.6
+    image: ghcr.io/google/cadvisor:v0.61.1
     restart: unless-stopped
     privileged: true
     command:
